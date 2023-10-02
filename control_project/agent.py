@@ -16,7 +16,8 @@ TAU = 1e-3              # for soft update of target parameters
 LR_ACTOR = 1e-4         # learning rate of the actor 
 LR_CRITIC = 1e-3        # learning rate of the critic
 WEIGHT_DECAY = 0        # L2 weight decay
-SIGMA_MIN=0.0001
+#SIGMA_MIN=0.0001
+SIGMA_MIN=0.05
 SIGMA_DECAY=0.99
 EPS=0.5
 
@@ -68,7 +69,7 @@ class Agent():
         if self.increment % 20 == 0:
             # Learn, if enough samples are available in memory
             if len(self.memory) > BATCH_SIZE:
-                for i in range(len(states)//2):
+                for i in range(len(states) // 2 ):
                     experiences = self.memory.sample()
                     self.learn(experiences, GAMMA)
 
