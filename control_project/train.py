@@ -22,14 +22,17 @@ def ddpg(state_size:int, action_size:int, env:UnityEnvironment, brain_name:str, 
         score = np.zeros(num_agents)
         for i in range(max_t):
 
-            actions = agent.act(states)
+            explore = True
+            if episode > 200:
+                explore = False
+            actions = agent.act(states, explore)
             env_info = env.step(actions)[brain_name]
             next_states = env_info.vector_observations
             for r in env_info.rewards:
                 if np.isclose(r,0.1):
                     print("found 0.1 reward")
             score += env_info.rewards
-            rewards = [r * 10 for r in env_info.rewards]
+            rewards = [r * 100 for r in env_info.rewards]
             dones = env_info.local_done
             agent.step(states, actions, rewards, next_states, dones)
             states = next_states
@@ -38,7 +41,7 @@ def ddpg(state_size:int, action_size:int, env:UnityEnvironment, brain_name:str, 
         scores_window.append(np.mean(score))
         scores.append(np.mean(score))
         if len(scores_window) >= 100 and np.mean(scores_window) >= 30:
-            print("fsolved environment in {episode} episodes")
+            print(f"solved environment in {episode} episodes average score={np.mean(scores_window)}")
             torch.save(agent.actor_local.state_dict(), 'checkpoint_actor.pth')
             torch.save(agent.critic_local.state_dict(), 'checkpoint_critic.pth')
             return scores, scores_window
@@ -52,16 +55,11 @@ def ddpg(state_size:int, action_size:int, env:UnityEnvironment, brain_name:str, 
     return scores, scores_window
 
 def plot(scores:List[float], scores_window:deque):
-    fig, axes = plt.subplots(2, 1)
-    axes[0, 0] = plot(np.arange(len(scores)), scores)
-    axes[0, 0].set_title("Scores")
-    axes[0, 0].set_xlabel("timesteps")
-    axes[0, 0].set_ylabel("episodes score")
-
-    axes[1, 0] = plot(np.arange(len(scores_window)), list(scores_window))
-    axes[1, 0].set_title("Last 100 scores")
-    axes[1, 0].set_xlabel("timesteps")
-    axes[1, 0].set_ylabel("episodes score")
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plt.plot(np.arange(len(scores)), scores)
+    plt.ylabel('Score')
+    plt.xlabel('Episode #')
     plt.show()
     plt.savefig("./plot.png")
 
@@ -78,6 +76,6 @@ if __name__ == '__main__':
     action_size = brain.vector_action_space_size
     states = env_info.vector_observations
     state_size = states.shape[1]
-    scores, scores_window = ddpg(state_size, action_size, env, brain_name, num_agents, print_every=10)
+    scores, scores_window = ddpg(state_size, action_size, env, brain_name, num_agents, print_every=10, max_t=2000, n_episodes=500)
     plot(scores, scores_window)
     
