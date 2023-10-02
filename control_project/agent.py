@@ -19,7 +19,7 @@ WEIGHT_DECAY = 0        # L2 weight decay
 #SIGMA_MIN=0.0001
 SIGMA_MIN=0.05
 SIGMA_DECAY=0.99
-EPS=0.5
+EPS=0.5 # starting point of epsilong greedy, it decays with every episode till it reaches SIGMA_MIN
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -68,6 +68,9 @@ class Agent():
 
         if self.increment % 20 == 0:
             # Learn, if enough samples are available in memory
+            # running this after every experience addtion was taking too long to train and
+            # This allows significantly more samples to be collected for attempting to learn
+            # allowing the agent to see many more states and actions.
             if len(self.memory) > BATCH_SIZE:
                 for i in range(len(states) // 2 ):
                     experiences = self.memory.sample()
@@ -75,6 +78,9 @@ class Agent():
 
     def act(self, state, add_noise=True):
         """Returns actions for given state as per current policy."""
+
+        # using epsilon greedy seems to train the agent much faster compared to ounoise as
+        # it enables exploration of factions from a much broader range.
         if add_noise and np.random.rand() < EPS:
             return np.random.uniform(-1, 1, size=(len(state), self.action_size))
 
