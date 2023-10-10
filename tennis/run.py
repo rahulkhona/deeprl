@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from collections import deque
 import os
 import constants as C
+import random
 
 def plot(scores, image_folder):
     x = [i for i in range(len(scores))]
@@ -17,7 +18,10 @@ def plot(scores, image_folder):
         plt.savefit(os.path.join(image_folder, "plot.png"))
     plt.show()
 
-def run():
+def run(seed:int=0x10020303):
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
     env = UnityEnvironment(file_name="./Tennis.app", no_graphics=True)
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
