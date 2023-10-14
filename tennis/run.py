@@ -36,6 +36,11 @@ def run(seed:int=0x10020303):
 
     agent = MADDPGAgent(num_agents, state_size, action_size)
 
+    all_zeros = 0
+    all_positive = 0
+    all_negative = 0
+    one_positive_one_zero = 0
+    one_negative_one_zero = 0
     scores = []
     scores_window = deque(maxlen=C.SCORES_WINDOW_LENGTH)
     print("Starting training")
@@ -47,12 +52,24 @@ def run(seed:int=0x10020303):
         score = np.zeros(num_agents)
 
         while True:
-            actions = agent.choose_actions(torch.from_numpy(obs).float().to(device), True)
+            actions = agent.choose_actions(torch.from_numpy(obs).float().to(device), True if i < 10000 else False)
+            #actions = np.asarray([np.random.uniform(-1, 1, 2), np.random.uniform(-1, 1, 2)])
             env_info = env.step(actions)[brain_name]
             rewards = np.asarray(env_info.rewards)
             dones = np.array(env_info.local_done).astype(np.uint8)
             next_obs = env_info.vector_observations
-            agent.step(obs, actions, rewards, next_obs, dones)
+            # scale rewards so gradients are larger for non zero values for faster training
+            agent.step(obs, actions, rewards * 10, next_obs, dones)
+            if np.all(rewards == 0):
+                all_zeros += 1
+            elif np.all(rewards > 0):
+                all_positive += 1
+            elif np.all(rewards < 0):
+                all_negative += 1
+            elif np.any(rewards > 0) and np.any(rewards == 0):
+                one_positive_one_zero += 1
+            else:
+                one_negative_one_zero += 1
             obs = next_obs
             score += rewards
             steps += 1
@@ -67,6 +84,7 @@ def run(seed:int=0x10020303):
             return scores, scores_window, True, i
         if i % C.PRINT_EVERY == 0:
             print(f"completed {i} episodes and average score is {np.mean(scores_window)} average steps per episode {steps/i}", end="\n")
+            print("counts : ", all_zeros, all_positive, all_negative, one_positive_one_zero, one_negative_one_zero)
     
     env.close()
     return scores, scores_window, False, i

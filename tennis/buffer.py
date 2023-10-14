@@ -28,14 +28,14 @@ class MultiAgentReplayBuffer:
 
     def add(self, obs:List[np.ndarray], actions:List[np.ndarray], rewards:List[float], next_obs:List[np.ndarray], dones:List[bool]):
         self.memory.append(MultiAgentExperience(obs, actions, rewards, next_obs, dones))
-        if np.all(rewards > 0.09):
-            for i in range(5):
+        if np.all(rewards > 0):
+            for i in range(100):
                 self.memory.append(MultiAgentExperience(obs, actions, rewards, next_obs, dones))
-        elif np.any(rewards > 0.09):
-            for i in range(2):
+        elif np.any(rewards > 0):
+            for i in range(100):
                 self.memory.append(MultiAgentExperience(obs, actions, rewards, next_obs, dones))
         elif np.all(rewards < 0.0):
-            for i in range(5):
+            for i in range(50):
                 self.memory.append(MultiAgentExperience(obs, actions, rewards, next_obs, dones))
 
     def sample(self)->List[MultiAgentExperience]:
