@@ -7,6 +7,7 @@ from collections import deque
 import os
 import constants as C
 import random
+import math
 
 def plot(scores, image_folder):
     x = [i for i in range(len(scores))]
@@ -46,7 +47,7 @@ def run(seed:int=0x10020303):
         score = np.zeros(num_agents)
 
         while True:
-            actions = agent.choose_actions(torch.from_numpy(obs).float().to(device))
+            actions = agent.choose_actions(torch.from_numpy(obs).float().to(device), True)
             env_info = env.step(actions)[brain_name]
             rewards = np.asarray(env_info.rewards)
             dones = np.array(env_info.local_done).astype(np.uint8)
