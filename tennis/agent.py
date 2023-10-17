@@ -8,6 +8,7 @@ from buffer import ExperienceSampler, MultiAgentReplayBuffer
 from constants import DEFAULT_BATCH_SIZE, DEFAULT_BUFFER_SIZE, GAMMA, ACTOR_LR, CRIITC_LR, TAU, CRITIC_WEIGHT_DECAY, LEARN_EVERY
 from typing import Optional, List
 import os
+import random
 
 class DDPGAgent:
     def __init__(self, id:int, num_agents:int, obs_dim:int, action_dim:int, noise:OUNoise, device:str="cpu", gamma:float=GAMMA, tau:float=TAU,
@@ -70,6 +71,18 @@ class DDPGAgent:
     def predict(self, obs:torch.tensor, local:bool)->torch.tensor:
         return self.actor(obs) if local else self.actor_target(obs)
     
+    def pretrain(self, sampler:ExperienceSampler):
+        states = sampler.getStates()
+        actions_taken = sampler.getActions()
+        rewards = sampler.getRewards(self.id)
+        critic_values = self.critic(states, actions_taken)
+        critic_loss = F.mse_loss(critic_values, rewards)
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        #torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
+        self.critic_optimizer.step()
+        return critic_loss.item()
+
     def learn(self, sampler:ExperienceSampler, current_action_predictions:List[torch.tensor],
               next_action_predictions:List[torch.tensor]):
         states = sampler.getStates()
@@ -85,11 +98,12 @@ class DDPGAgent:
         #TODO how do we handle if some actors are done and others are not done
         # in our case done would be true for all agents or none, so we are good with
         # dones for current agent
-        critic_loss = F.mse_loss(critic_values, rewards + self.discount * q_next * (1 - dones))
+        #critic_loss = F.mse_loss(critic_values, rewards + self.discount * q_next * (1 - dones))
+        critic_loss = F.smooth_l1_loss(critic_values, rewards + self.discount * q_next * (1 - dones))
         with torch.autograd.set_detect_anomaly(True):
             self.critic_optimizer.zero_grad()
             critic_loss.backward()
-            #torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
             self.critic_optimizer.step()
 
         # Train actor
@@ -154,17 +168,17 @@ class MADDPGAgent:
         self.iteration += 1
         self.memory.add(obs, actions, rewards, next_obs, dones)
         if len(self.memory) > self.memory.batch_size and self.iteration % LEARN_EVERY == 0:
-            for i in range(5):
+            epocs = 4 #len(self.memory) // self.memory.batch_size
+            for i in range(4):
                 self.learn()
 
     def learn(self):
-        sampler = ExperienceSampler(self.memory, self.device)
         for i in range(self.num_agents):
+            sampler = ExperienceSampler(self.memory, self.device)
             # get actions that we would have predicted given current policy. We use these to maximize
             # returns for current state and learn the policy
             current_action_predictions = [self.agents[i].actor(sampler.getObs(i)).to(self.device) for i in range(self.num_agents)]
 
-            # predict actions we would take for next states based on target policy, we will use this
             # to learn critic
             next_action_predictions = [self.agents[i].actor_target(sampler.getNextObs(i)).to(self.device).detach() for i in range(self.num_agents)]
             self.agents[i].learn(sampler, current_action_predictions, next_action_predictions)
@@ -174,3 +188,14 @@ class MADDPGAgent:
     def save(self, folder:str):
         for agent in self.agents:
             agent.save(folder)
+
+    def pretrain(self, obs, actions, rewards, next_obs, dones):
+        errors = []
+        for i in range(1000000):
+            sampler = ExperienceSampler(self.memory, self.device)
+            for i in range(self.num_agents):
+                # get actions that we would have predicted given current policy. We use these to maximize
+                # returns for current state and learn the policy
+                errors.append(self.agents[i].pretrain(self, sampler))
+        print(f"completed {i} iterations")
+        return errors
