@@ -8,7 +8,6 @@ from buffer import ExperienceSampler, MultiAgentReplayBuffer
 from constants import DEFAULT_BATCH_SIZE, DEFAULT_BUFFER_SIZE, GAMMA, ACTOR_LR, CRIITC_LR, TAU, CRITIC_WEIGHT_DECAY, LEARN_EVERY
 from typing import Optional, List
 import os
-import random
 
 class DDPGAgent:
     def __init__(self, id:int, num_agents:int, obs_dim:int, action_dim:int, noise:OUNoise, device:str="cpu", gamma:float=GAMMA, tau:float=TAU,
@@ -38,9 +37,6 @@ class DDPGAgent:
         self.soft_update_both(1)
 
         self.noise = noise
-
-
-
     
     def soft_update(self, target_model:nn.Module, source_model:nn.Module, tau:Optional[float]):
         if tau is None:
@@ -71,18 +67,6 @@ class DDPGAgent:
     def predict(self, obs:torch.tensor, local:bool)->torch.tensor:
         return self.actor(obs) if local else self.actor_target(obs)
     
-    def pretrain(self, sampler:ExperienceSampler):
-        states = sampler.getStates()
-        actions_taken = sampler.getActions()
-        rewards = sampler.getRewards(self.id)
-        critic_values = self.critic(states, actions_taken)
-        critic_loss = F.mse_loss(critic_values, rewards)
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        #torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
-        self.critic_optimizer.step()
-        return critic_loss.item()
-
     def learn(self, sampler:ExperienceSampler, current_action_predictions:List[torch.tensor],
               next_action_predictions:List[torch.tensor]):
         states = sampler.getStates()
